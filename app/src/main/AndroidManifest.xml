@@ -1,14 +1,35 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:theme="@style/Theme.PCBoard" android:label="PCBoard Keyboard" android:allowBackup="true" android:supportsRtl="true">
-        <activity android:name=".MainActivity" android:exported="true">
+    <application
+        android:allowBackup="false"
+        android:label="PCBoard Keyboard"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PCBoard"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name=".PcKeyboardService" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true">
-            <intent-filter><action android:name="android.view.InputMethod" /></intent-filter>
-            <meta-data android:name="android.view.im" android:resource="@xml/method" />
+
+        <service
+            android:name=".PcKeyboardService"
+            android:exported="true"
+            android:label="PCBoard Keyboard"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
         </service>
     </application>
 </manifest>
