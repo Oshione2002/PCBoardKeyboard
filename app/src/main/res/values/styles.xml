@@ -1,3 +1,9 @@
 <resources>
-<style name="Theme.PCBoard" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:colorAccent">#4F7DF3</item><item name="android:navigationBarColor">#111318</item></style>
+    <style name="Theme.PCBoard" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#4F6FE0</item>
+        <item name="android:statusBarColor">#F7F8FB</item>
+        <item name="android:navigationBarColor">#181A1F</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>
