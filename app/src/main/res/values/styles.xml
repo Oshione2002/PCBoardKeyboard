@@ -1,0 +1,3 @@
+<resources>
+<style name="Theme.PCBoard" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:colorAccent">#4F7DF3</item><item name="android:navigationBarColor">#111318</item></style>
+</resources>
