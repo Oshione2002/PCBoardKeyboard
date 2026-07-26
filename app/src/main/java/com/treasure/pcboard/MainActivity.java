@@ -17,21 +17,22 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(24), dp(32), dp(24), dp(40)); root.setBackgroundColor(Color.rgb(247,248,251));
         scroll.addView(root);
 
-        TextView title = text("PCBoard Keyboard", 32, Color.rgb(20,23,30)); root.addView(title);
-        TextView subtitle = text("Modern Android typing with Ctrl, Tab and productivity profiles.", 17, Color.DKGRAY); subtitle.setPadding(0, dp(8), 0, dp(22)); root.addView(subtitle);
+        TextView title = text("PCBoard Keyboard 2.0", 32, Color.rgb(20,23,30)); root.addView(title);
+        TextView subtitle = text("Taller Android typing with Ctrl, Tab, glide input, voice, translation and productivity tools.", 17, Color.DKGRAY);
+        subtitle.setPadding(0, dp(8), 0, dp(22)); root.addView(subtitle);
 
         root.addView(card("1. Enable the keyboard", "Android requires you to enable every third-party keyboard manually.", "Open input settings", v -> startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))));
         root.addView(card("2. Select PCBoard", "Choose PCBoard Keyboard from Android's keyboard picker.", "Choose keyboard", v -> {
             InputMethodManager manager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (manager != null) manager.showInputMethodPicker();
         }));
-        root.addView(card("3. Configure it", "Adjust prediction, autocorrection, layout, height, feedback, privacy and English variant.", "Open settings", v -> startActivity(new Intent(this, SettingsActivity.class))));
+        root.addView(card("3. Configure it", "Adjust height, bottom spacing, long-press symbols, glide typing, voice, translation, handwriting, toolbar order and shortcuts.", "Open settings", v -> startActivity(new Intent(this, SettingsActivity.class))));
 
         TextView testLabel = text("Test the keyboard", 19, Color.rgb(55,80,170)); testLabel.setPadding(0, dp(22), 0, dp(6)); root.addView(testLabel);
         EditText test = new EditText(this); test.setHint("Tap here, then select PCBoard Keyboard"); test.setMinLines(7); test.setGravity(Gravity.TOP); test.setTextSize(18); test.setPadding(dp(14), dp(14), dp(14), dp(14));
         root.addView(test, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180)));
 
-        TextView privacy = text("Privacy: PCBoard has no internet permission. Learning and suggestions are disabled in password fields and whenever an app requests no personalised learning.", 14, Color.DKGRAY);
+        TextView privacy = text("Privacy: PCBoard has no internet permission. Voice typing uses the Android speech service selected by your device. Learning and suggestions are disabled in password fields and whenever an app requests no personalised learning.", 14, Color.DKGRAY);
         privacy.setPadding(0, dp(20), 0, 0); root.addView(privacy);
         setContentView(scroll);
     }
