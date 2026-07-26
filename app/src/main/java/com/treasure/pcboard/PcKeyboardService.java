@@ -3,7 +3,6 @@ package com.treasure.pcboard;
 import android.content.*;
 import android.content.res.Configuration;
 import android.graphics.Color;
-import android.graphics.Insets;
 import android.graphics.drawable.GradientDrawable;
 import android.inputmethodservice.InputMethodService;
 import android.os.Build;
@@ -14,10 +13,8 @@ import android.widget.*;
 import java.util.*;
 
 public final class PcKeyboardService extends InputMethodService implements
-        KeyboardSurface.Listener,
-        VoiceTypingController.Listener,
-        SystemTranslationController.Listener,
-        HandwritingPopupController.Listener {
+        KeyboardSurface.Listener, VoiceTypingController.Listener,
+        SystemTranslationController.Listener, HandwritingPopupController.Listener {
 
     private enum Panel { SUGGESTIONS, TOOLS, CLIPBOARD, EMOJI, TRANSLATION, SNIPPETS }
 
@@ -32,11 +29,9 @@ public final class PcKeyboardService extends InputMethodService implements
     private SystemTranslationController translationController;
     private HandwritingPopupController handwritingController;
 
-    private LinearLayout root;
-    private LinearLayout topRow;
+    private LinearLayout root, topRow;
     private FrameLayout keyboardFrame;
     private KeyboardSurface keyboardSurface;
-
     private Panel panel = Panel.SUGGESTIONS;
     private KeyboardLayoutFactory.ShiftState shiftState = KeyboardLayoutFactory.ShiftState.OFF;
     private ProfileManager.Profile profile = ProfileManager.Profile.DEFAULT;
@@ -46,10 +41,7 @@ public final class PcKeyboardService extends InputMethodService implements
     private EditorInfo editorInfo;
     private Correction lastCorrection;
     private List<String> glideAlternatives = Collections.emptyList();
-    private String voiceStatus = "";
-    private String translationStatus = "";
-    private String translationOriginal = "";
-    private String translationResult = "";
+    private String voiceStatus = "", translationStatus = "", translationResult = "";
 
     private static final class Correction {
         final String original, corrected;
@@ -83,20 +75,14 @@ public final class PcKeyboardService extends InputMethodService implements
     @Override public View onCreateInputView() {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setClipChildren(false);
-        root.setClipToPadding(false);
+        root.setClipChildren(false); root.setClipToPadding(false);
         applyBottomSafetyGap(null);
-        root.setOnApplyWindowInsetsListener((view, insets) -> {
-            applyBottomSafetyGap(insets);
-            return insets;
-        });
+        root.setOnApplyWindowInsetsListener((view, insets) -> { applyBottomSafetyGap(insets); return insets; });
 
         HorizontalScrollView topScroll = new HorizontalScrollView(this);
         topScroll.setHorizontalScrollBarEnabled(false);
-        topScroll.setFillViewport(false);
         topRow = new LinearLayout(this);
-        topRow.setOrientation(LinearLayout.HORIZONTAL);
-        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        topRow.setOrientation(LinearLayout.HORIZONTAL); topRow.setGravity(Gravity.CENTER_VERTICAL);
         topRow.setPadding(dp(3), dp(3), dp(3), dp(3));
         topScroll.addView(topRow, new HorizontalScrollView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(52)));
         root.addView(topScroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
@@ -105,9 +91,7 @@ public final class PcKeyboardService extends InputMethodService implements
         keyboardSurface = new KeyboardSurface(this);
         keyboardFrame.addView(keyboardSurface);
         root.addView(keyboardFrame, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        rebuildAll();
-        root.post(root::requestApplyInsets);
-        return root;
+        rebuildAll(); root.post(root::requestApplyInsets); return root;
     }
 
     @Override public void onStartInputView(EditorInfo attribute, boolean restarting) {
@@ -115,10 +99,10 @@ public final class PcKeyboardService extends InputMethodService implements
         editorInfo = attribute;
         inputKind = KeyboardLayoutFactory.inputKind(attribute);
         if (preferences.autoProfile()) profile = ProfileManager.detect(attribute == null ? null : attribute.packageName);
-        symbols = false; ctrl = false; alt = false; panel = Panel.SUGGESTIONS; lastCorrection = null;
-        glideAlternatives = Collections.emptyList(); translationStatus = translationOriginal = translationResult = "";
+        symbols = ctrl = alt = false; panel = Panel.SUGGESTIONS; lastCorrection = null;
+        glideAlternatives = Collections.emptyList(); translationStatus = translationResult = "";
         stopVoiceComposing();
-        if (voiceController != null && voiceController.isListening()) voiceController.stop();
+        if (voiceController.isListening()) voiceController.stop();
         layoutConfig = customLayoutStore.load();
         shiftState = preferences.autoCap() && shouldAutoCap() ? KeyboardLayoutFactory.ShiftState.ON : KeyboardLayoutFactory.ShiftState.OFF;
         rebuildAll();
@@ -126,19 +110,16 @@ public final class PcKeyboardService extends InputMethodService implements
 
     @Override public void onFinishInput() {
         stopVoiceComposing();
-        if (voiceController != null && voiceController.isListening()) voiceController.stop();
+        if (voiceController.isListening()) voiceController.stop();
         super.onFinishInput();
     }
 
-    @Override public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        rebuildAll();
-    }
+    @Override public void onConfigurationChanged(Configuration newConfig) { super.onConfigurationChanged(newConfig); rebuildAll(); }
 
     @Override public void onWindowHidden() {
-        ctrl = false; alt = false; lastCorrection = null;
-        if (voiceController != null && voiceController.isListening()) voiceController.stop();
-        if (handwritingController != null) handwritingController.dismiss();
+        ctrl = alt = false; lastCorrection = null;
+        if (voiceController.isListening()) voiceController.stop();
+        handwritingController.dismiss();
         super.onWindowHidden();
     }
 
@@ -187,8 +168,7 @@ public final class PcKeyboardService extends InputMethodService implements
     @Override public void onAlternate(String text) {
         InputConnection connection = getCurrentInputConnection();
         if (connection != null) connection.commitText(text, 1);
-        glideAlternatives = Collections.emptyList();
-        consumeShift(); renderTopPanel();
+        glideAlternatives = Collections.emptyList(); consumeShift(); renderTopPanel();
     }
 
     @Override public void onGlide(List<String> path) {
@@ -200,9 +180,7 @@ public final class PcKeyboardService extends InputMethodService implements
         String value = shiftState == KeyboardLayoutFactory.ShiftState.OFF ? best : matchCase("A", best);
         connection.commitText(value + " ", 1);
         if (!isPrivateMode()) personalLexicon.learn(best, previousWord());
-        glideAlternatives = candidates;
-        lastCorrection = null;
-        consumeShift(); renderTopPanel();
+        glideAlternatives = candidates; lastCorrection = null; consumeShift(); renderTopPanel();
     }
 
     @Override public void onSpaceCursor(int direction) {
@@ -213,8 +191,7 @@ public final class PcKeyboardService extends InputMethodService implements
     @Override public void onDeleteWord() {
         InputConnection connection = getCurrentInputConnection();
         if (connection == null) return;
-        String before = beforeCursor(120);
-        if (before.isEmpty()) return;
+        String before = beforeCursor(120); if (before.isEmpty()) return;
         int index = before.length() - 1;
         while (index >= 0 && Character.isWhitespace(before.charAt(index))) index--;
         while (index >= 0 && isWordCharacter(before.charAt(index))) index--;
@@ -225,28 +202,19 @@ public final class PcKeyboardService extends InputMethodService implements
 
     @Override public void onHide() { requestHideSelf(0); }
 
-    @Override public void onVoiceState(String state, boolean listening) {
-        voiceStatus = state == null ? "" : state;
-        renderTopPanel();
-    }
+    @Override public void onVoiceState(String state, boolean listening) { voiceStatus = state == null ? "" : state; renderTopPanel(); }
 
     @Override public void onVoiceText(String text, boolean isFinal) {
         InputConnection connection = getCurrentInputConnection();
         if (connection == null || text == null || text.trim().isEmpty()) return;
         String value = text.trim();
         if (isFinal) {
-            connection.setComposingText(value + " ", 1);
-            connection.finishComposingText();
-            voiceComposing = false;
+            connection.setComposingText(value + " ", 1); connection.finishComposingText(); voiceComposing = false;
             if (!isPrivateMode()) {
-                String[] words = value.split("\\s+");
                 String previous = previousWord();
-                for (String word : words) { personalLexicon.learn(word, previous); previous = word; }
+                for (String word : value.split("\\s+")) { personalLexicon.learn(word, previous); previous = word; }
             }
-        } else {
-            connection.setComposingText(value, 1);
-            voiceComposing = true;
-        }
+        } else { connection.setComposingText(value, 1); voiceComposing = true; }
         renderTopPanel();
     }
 
@@ -257,21 +225,17 @@ public final class PcKeyboardService extends InputMethodService implements
     }
 
     @Override public void onTranslationState(String message) {
-        translationStatus = message == null ? "" : message;
-        panel = Panel.TRANSLATION; renderTopPanel();
+        translationStatus = message == null ? "" : message; panel = Panel.TRANSLATION; renderTopPanel();
     }
 
     @Override public void onTranslationResult(String original, String translated) {
-        translationOriginal = original == null ? "" : original;
         translationResult = translated == null ? "" : translated;
-        translationStatus = "Translation ready";
-        panel = Panel.TRANSLATION; renderTopPanel();
+        translationStatus = "Translation ready"; panel = Panel.TRANSLATION; renderTopPanel();
     }
 
     @Override public void onTranslationError(String message) {
         translationStatus = message == null ? "Translation failed" : message;
-        translationResult = "";
-        panel = Panel.TRANSLATION; renderTopPanel();
+        translationResult = ""; panel = Panel.TRANSLATION; renderTopPanel();
         Toast.makeText(this, translationStatus, Toast.LENGTH_LONG).show();
     }
 
@@ -294,8 +258,7 @@ public final class PcKeyboardService extends InputMethodService implements
             clearOneShotModifiers(); return;
         }
         String value = shiftState == KeyboardLayoutFactory.ShiftState.OFF ? output : output.toUpperCase(Locale.ROOT);
-        connection.commitText(value, 1);
-        lastCorrection = null; consumeShift(); renderTopPanel();
+        connection.commitText(value, 1); lastCorrection = null; consumeShift(); renderTopPanel();
     }
 
     private void toggleShift() {
@@ -307,12 +270,10 @@ public final class PcKeyboardService extends InputMethodService implements
     }
 
     private void consumeShift() {
-        if (shiftState == KeyboardLayoutFactory.ShiftState.ON) {
-            shiftState = KeyboardLayoutFactory.ShiftState.OFF; rebuildKeyboard();
-        }
+        if (shiftState == KeyboardLayoutFactory.ShiftState.ON) { shiftState = KeyboardLayoutFactory.ShiftState.OFF; rebuildKeyboard(); }
     }
 
-    private void clearOneShotModifiers() { ctrl = false; alt = false; rebuildKeyboard(); }
+    private void clearOneShotModifiers() { ctrl = alt = false; rebuildKeyboard(); }
 
     private void handleBackspace(InputConnection connection) {
         if (tryUndoCorrection(connection)) return;
@@ -326,9 +287,8 @@ public final class PcKeyboardService extends InputMethodService implements
 
     private boolean tryUndoCorrection(InputConnection connection) {
         if (lastCorrection == null || SystemClock.uptimeMillis() - lastCorrection.time > 6000) return false;
-        String before = beforeCursor(lastCorrection.corrected.length() + 2);
         String expected = lastCorrection.corrected + " ";
-        if (!before.endsWith(expected)) return false;
+        if (!beforeCursor(expected.length() + 1).endsWith(expected)) return false;
         connection.deleteSurroundingText(expected.length(), 0);
         connection.commitText(lastCorrection.original, 1);
         lastCorrection = null; renderTopPanel(); return true;
@@ -345,13 +305,13 @@ public final class PcKeyboardService extends InputMethodService implements
                 rebuildKeyboard(); renderTopPanel(); return;
             }
         }
-        String original = currentWord(); String previous = previousWord(); String finalWord = original;
+        String original = currentWord(), previous = previousWord(), finalWord = original;
         if (preferences.autocorrect() && !isPrivateMode() && !original.isEmpty()) {
             String corrected = suggestionEngine.bestCorrection(original, previous, personalLexicon, profile, preferences.dialect());
             if (!corrected.equalsIgnoreCase(original)) {
                 connection.deleteSurroundingText(original.length(), 0);
-                connection.commitText(matchCase(original, corrected), 1);
-                finalWord = corrected; lastCorrection = new Correction(original, matchCase(original, corrected));
+                String matched = matchCase(original, corrected);
+                connection.commitText(matched, 1); finalWord = corrected; lastCorrection = new Correction(original, matched);
             }
         }
         if (!isPrivateMode() && !finalWord.isEmpty()) personalLexicon.learn(finalWord, previous);
@@ -379,8 +339,7 @@ public final class PcKeyboardService extends InputMethodService implements
     }
 
     private void replaceCurrentWord(String suggestion) {
-        InputConnection connection = getCurrentInputConnection();
-        if (connection == null) return;
+        InputConnection connection = getCurrentInputConnection(); if (connection == null) return;
         String current = currentWord();
         if (!current.isEmpty()) connection.deleteSurroundingText(current.length(), 0);
         connection.commitText(matchCase(current, suggestion) + " ", 1);
@@ -390,9 +349,9 @@ public final class PcKeyboardService extends InputMethodService implements
 
     private void rebuildAll() {
         if (root == null) return;
-        layoutConfig = customLayoutStore.load();
-        applyPalette(); applyBottomSafetyGap(null);
-        boolean glideAvailable = preferences.glideTyping() && !symbols && inputKind == KeyboardLayoutFactory.InputKind.TEXT
+        layoutConfig = customLayoutStore.load(); applyPalette(); applyBottomSafetyGap(null);
+        boolean glideAvailable = preferences.glideTyping() && !symbols
+                && inputKind == KeyboardLayoutFactory.InputKind.TEXT
                 && profile == ProfileManager.Profile.DEFAULT && !isPrivateMode();
         keyboardSurface.configure(this, preferences.keyPopup(), preferences.haptic(), preferences.sound(),
                 preferences.longPressDelay(), preferences.symbolHints(), glideAvailable);
@@ -441,31 +400,23 @@ public final class PcKeyboardService extends InputMethodService implements
         }
     }
 
-    private void togglePanel(Panel target) {
-        panel = panel == target ? Panel.SUGGESTIONS : target; renderTopPanel();
-    }
+    private void togglePanel(Panel target) { panel = panel == target ? Panel.SUGGESTIONS : target; renderTopPanel(); }
 
     private void renderSuggestions() {
-        if (!voiceStatus.isEmpty() && voiceController.isListening()) {
-            addTopLabel(voiceStatus); return;
-        }
-        if (!preferences.predictions() || isPrivateMode()) {
-            addTopLabel(isPrivateMode() ? "Private typing" : "Suggestions off"); return;
-        }
-        List<String> suggestions;
-        if (!glideAlternatives.isEmpty()) suggestions = new ArrayList<>(glideAlternatives);
-        else suggestions = suggestionEngine.suggest(currentWord(), previousWord(), personalLexicon, profile, preferences.dialect(), 3);
+        if (!voiceStatus.isEmpty() && voiceController.isListening()) { addTopLabel(voiceStatus); return; }
+        if (!preferences.predictions() || isPrivateMode()) { addTopLabel(isPrivateMode() ? "Private typing" : "Suggestions off"); return; }
+        List<String> suggestions = glideAlternatives.isEmpty()
+                ? suggestionEngine.suggest(currentWord(), previousWord(), personalLexicon, profile, preferences.dialect(), 3)
+                : new ArrayList<>(glideAlternatives);
         if (preferences.emojiSuggestions() && glideAlternatives.isEmpty()) {
             List<String> emoji = suggestionEngine.emojiForWord(currentWord().isEmpty() ? previousWord() : currentWord());
             if (!emoji.isEmpty() && !suggestions.isEmpty()) suggestions.set(Math.min(2, suggestions.size() - 1), emoji.get(0));
         }
-        for (String suggestion : suggestions) {
-            addTopButton(suggestion, "Suggestion " + suggestion, () -> {
-                if (isEmojiLike(suggestion)) {
-                    InputConnection connection = getCurrentInputConnection(); if (connection != null) connection.commitText(suggestion, 1);
-                } else replaceCurrentWord(suggestion);
-            });
-        }
+        for (String suggestion : suggestions) addTopButton(suggestion, "Suggestion " + suggestion, () -> {
+            if (isEmojiLike(suggestion)) {
+                InputConnection connection = getCurrentInputConnection(); if (connection != null) connection.commitText(suggestion, 1);
+            } else replaceCurrentWord(suggestion);
+        });
     }
 
     private void renderTools() {
@@ -510,8 +461,7 @@ public final class PcKeyboardService extends InputMethodService implements
         if (!translationResult.isEmpty()) {
             String label = translationResult.length() > 32 ? translationResult.substring(0, 32) + "…" : translationResult;
             addTopButton(label, "Insert translation", () -> {
-                InputConnection connection = getCurrentInputConnection();
-                if (connection != null) connection.commitText(translationResult, 1);
+                InputConnection connection = getCurrentInputConnection(); if (connection != null) connection.commitText(translationResult, 1);
                 panel = Panel.SUGGESTIONS; renderTopPanel();
             });
             addTopButton("Copy", "Copy translation", () -> {
@@ -540,20 +490,18 @@ public final class PcKeyboardService extends InputMethodService implements
 
     private void startTranslation() {
         if (isPrivateMode()) { onTranslationError("Translation is disabled in private fields."); return; }
-        InputConnection connection = getCurrentInputConnection();
-        if (connection == null) return;
+        InputConnection connection = getCurrentInputConnection(); if (connection == null) return;
         CharSequence selected = connection.getSelectedText(0);
         String source = selected == null ? "" : selected.toString().trim();
         if (source.isEmpty()) source = recentSentence();
-        translationOriginal = source; translationResult = ""; translationStatus = "Preparing translation…";
+        translationResult = ""; translationStatus = "Preparing translation…";
         panel = Panel.TRANSLATION; renderTopPanel();
         translationController.translate(source, preferences.translationTarget());
     }
 
     private void showHandwriting() {
         if (isPrivateMode()) { Toast.makeText(this, "Handwriting is disabled in private fields", Toast.LENGTH_LONG).show(); return; }
-        KeyboardSurface.Palette p = palette();
-        handwritingController.show(root, p.special, p.text, p.active);
+        KeyboardSurface.Palette p = palette(); handwritingController.show(root, p.special, p.text, p.active);
     }
 
     private void commitClipboardContent() {
@@ -565,8 +513,7 @@ public final class PcKeyboardService extends InputMethodService implements
 
     private void stopVoiceComposing() {
         if (!voiceComposing) return;
-        InputConnection connection = getCurrentInputConnection();
-        if (connection != null) connection.finishComposingText();
+        InputConnection connection = getCurrentInputConnection(); if (connection != null) connection.finishComposingText();
         voiceComposing = false;
     }
 
@@ -590,8 +537,7 @@ public final class PcKeyboardService extends InputMethodService implements
     }
 
     private void applyPalette() {
-        KeyboardSurface.Palette p = palette();
-        root.setBackgroundColor(p.background); topRow.setBackgroundColor(p.background);
+        KeyboardSurface.Palette p = palette(); root.setBackgroundColor(p.background); topRow.setBackgroundColor(p.background);
         if (Build.VERSION.SDK_INT >= 21 && getWindow() != null && getWindow().getWindow() != null) getWindow().getWindow().setNavigationBarColor(p.background);
     }
 
@@ -619,7 +565,7 @@ public final class PcKeyboardService extends InputMethodService implements
         int bottom = dp(preferences == null ? 20 : preferences.bottomGap());
         if (insets != null) {
             if (Build.VERSION.SDK_INT >= 30) {
-                Insets system = insets.getInsets(WindowInsets.Type.navigationBars() | WindowInsets.Type.systemGestures());
+                android.graphics.Insets system = insets.getInsets(WindowInsets.Type.navigationBars() | WindowInsets.Type.systemGestures());
                 bottom = Math.max(bottom, system.bottom + dp(4));
             } else bottom = Math.max(bottom, insets.getSystemWindowInsetBottom() + dp(4));
         }
@@ -656,8 +602,7 @@ public final class PcKeyboardService extends InputMethodService implements
     }
 
     private String recentSentence() {
-        String before = beforeCursor(500).trim();
-        if (before.isEmpty()) return "";
+        String before = beforeCursor(500).trim(); if (before.isEmpty()) return "";
         int start = Math.max(Math.max(before.lastIndexOf('.'), before.lastIndexOf('!')), Math.max(before.lastIndexOf('?'), before.lastIndexOf('\n')));
         String sentence = before.substring(Math.min(before.length(), start + 1)).trim();
         if (sentence.length() > 220) sentence = sentence.substring(sentence.length() - 220);
@@ -703,12 +648,9 @@ public final class PcKeyboardService extends InputMethodService implements
     }
 
     private static boolean isWordCharacter(char c) { return Character.isLetter(c) || c == '\'' || c == '’' || c == '-'; }
-
     private static boolean isEmojiLike(String value) {
         if (value == null || value.isEmpty()) return false;
-        int first = value.codePointAt(0);
-        return first > 0x1F000 || !value.matches("[A-Za-z'’ -]+");
+        int first = value.codePointAt(0); return first > 0x1F000 || !value.matches("[A-Za-z'’ -]+");
     }
-
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }
