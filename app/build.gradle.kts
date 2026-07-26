@@ -8,8 +8,8 @@ android {
         applicationId = "com.treasure.pcboard"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.3.0"
+        versionCode = 20
+        versionName = "2.0.0"
     }
 
     buildTypes {
