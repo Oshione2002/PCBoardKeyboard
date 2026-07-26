@@ -6,7 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.speech.RecognitionIntent;
+import android.speech.RecognizerIntent;
 import android.speech.RecognitionListener;
 import android.speech.SpeechRecognizer;
 import java.util.ArrayList;
@@ -55,12 +55,12 @@ public final class VoiceTypingController implements RecognitionListener {
             return;
         }
         recognizer.setRecognitionListener(this);
-        Intent intent = new Intent(RecognitionIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognitionIntent.EXTRA_LANGUAGE_MODEL, RecognitionIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognitionIntent.EXTRA_PARTIAL_RESULTS, true);
-        intent.putExtra(RecognitionIntent.EXTRA_MAX_RESULTS, 3);
-        intent.putExtra(RecognitionIntent.EXTRA_LANGUAGE, languageTag == null ? "en-NG" : languageTag);
-        intent.putExtra(RecognitionIntent.EXTRA_PREFER_OFFLINE, Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context));
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag == null ? "en-NG" : languageTag);
+        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context));
         listening = true;
         listener.onVoiceState("Listening…", true);
         recognizer.startListening(intent);
