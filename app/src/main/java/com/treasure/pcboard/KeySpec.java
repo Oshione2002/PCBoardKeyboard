@@ -11,6 +11,7 @@ public final class KeySpec {
     public final String label;
     public final String output;
     public final String alternate;
+    public final String hint;
     public final Action action;
     public final float weight;
     public final boolean repeatable;
@@ -18,9 +19,15 @@ public final class KeySpec {
 
     public KeySpec(String label, String output, String alternate, Action action,
                    float weight, boolean repeatable, String accessibilityLabel) {
+        this(label, output, alternate, null, action, weight, repeatable, accessibilityLabel);
+    }
+
+    public KeySpec(String label, String output, String alternate, String hint, Action action,
+                   float weight, boolean repeatable, String accessibilityLabel) {
         this.label = label;
         this.output = output;
         this.alternate = alternate;
+        this.hint = hint;
         this.action = action;
         this.weight = weight;
         this.repeatable = repeatable;
@@ -28,14 +35,18 @@ public final class KeySpec {
     }
 
     public static KeySpec text(String label) {
-        return new KeySpec(label, label, null, Action.TEXT, 1f, false, label);
+        return new KeySpec(label, label, null, null, Action.TEXT, 1f, false, label);
     }
 
     public static KeySpec text(String label, String output, String alternate, float weight) {
-        return new KeySpec(label, output, alternate, Action.TEXT, weight, false, output);
+        return new KeySpec(label, output, alternate, null, Action.TEXT, weight, false, output);
+    }
+
+    public static KeySpec text(String label, String output, String alternate, String hint, float weight) {
+        return new KeySpec(label, output, alternate, hint, Action.TEXT, weight, false, output);
     }
 
     public static KeySpec action(String label, Action action, float weight, boolean repeatable, String description) {
-        return new KeySpec(label, null, null, action, weight, repeatable, description);
+        return new KeySpec(label, null, null, null, action, weight, repeatable, description);
     }
 }
