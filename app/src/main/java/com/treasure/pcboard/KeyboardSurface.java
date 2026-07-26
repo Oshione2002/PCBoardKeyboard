@@ -78,8 +78,8 @@ public final class KeyboardSurface extends LinearLayout {
     private View createKey(KeySpec spec) {
         FrameLayout container = new FrameLayout(getContext());
         container.setTag(spec);
-        container.setMinWidth(dp(42));
-        container.setMinHeight(dp(48));
+        container.setMinimumWidth(dp(42));
+        container.setMinimumHeight(dp(48));
         container.setContentDescription(spec.accessibilityLabel + (spec.hint == null ? "" : ", long press for " + spec.hint));
         container.setFocusable(true); container.setClickable(true); container.setBackground(keyBackground(spec));
 
