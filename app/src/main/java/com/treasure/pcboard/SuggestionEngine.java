@@ -73,20 +73,42 @@ public final class SuggestionEngine {
                 if (cleanPrefix.isEmpty() || word.startsWith(cleanPrefix)) addScore(scores, word, 900_000);
             }
         }
+        return ranked(scores, limit);
+    }
 
-        List<Candidate> candidates = new ArrayList<>();
-        for (Map.Entry<String,Double> entry : scores.entrySet()) {
-            if (!entry.getKey().isEmpty()) candidates.add(new Candidate(entry.getKey(), entry.getValue()));
+    public List<String> glideCandidates(List<String> path, PersonalLexicon personal,
+                                        ProfileManager.Profile profile, String dialect, int limit) {
+        String signature = collapsePath(path);
+        if (signature.length() < 2) return Collections.emptyList();
+        Map<String,Double> scores = new HashMap<>();
+        for (int index = 0; index < words.size(); index++) {
+            String word = words.get(index);
+            if (word.length() < 2 || word.length() > 20) continue;
+            String wordSignature = collapseLetters(word);
+            int distance = levenshtein(signature, wordSignature);
+            int endpointPenalty = 0;
+            if (signature.charAt(0) != wordSignature.charAt(0)) endpointPenalty += 2;
+            if (signature.charAt(signature.length() - 1) != wordSignature.charAt(wordSignature.length() - 1)) endpointPenalty += 2;
+            int missing = subsequenceMissing(wordSignature, signature);
+            int tolerance = Math.max(4, signature.length() / 2 + 1);
+            if (distance + endpointPenalty + missing > tolerance) continue;
+            double score = 1_800_000
+                    - distance * 190_000.0
+                    - endpointPenalty * 140_000.0
+                    - missing * 110_000.0
+                    - Math.abs(wordSignature.length() - signature.length()) * 30_000.0
+                    - index * 75.0
+                    + personal.wordBoost(word) * 18_000.0;
+            addScore(scores, applyDialect(word, dialect), score);
         }
-        candidates.sort((a,b) -> Double.compare(b.score, a.score));
-
-        List<String> result = new ArrayList<>();
-        for (Candidate candidate : candidates) {
-            if (!result.contains(candidate.word)) result.add(candidate.word);
-            if (result.size() >= limit) break;
+        addProfileWords(scores, "", profile);
+        if (dialect != null && dialect.toLowerCase(Locale.ROOT).contains("nigerian")) {
+            for (String word : pidginWords) {
+                String candidate = clean(word);
+                if (!candidate.contains(" ") && levenshtein(signature, collapseLetters(candidate)) <= 3) addScore(scores, word, 1_150_000);
+            }
         }
-        if (result.isEmpty()) result.addAll(Arrays.asList("the", "and", "you"));
-        return result;
+        return ranked(scores, limit);
     }
 
     public String bestCorrection(String word, String previous, PersonalLexicon personal,
@@ -100,8 +122,7 @@ public final class SuggestionEngine {
             String candidate = clean(option);
             int distance = damerauLevenshtein(clean, candidate, 2);
             if (distance < bestDistance && distance <= (clean.length() >= 7 ? 2 : 1)) {
-                bestDistance = distance;
-                best = option;
+                bestDistance = distance; best = option;
             }
         }
         return best;
@@ -112,14 +133,28 @@ public final class SuggestionEngine {
         return value == null ? Collections.emptyList() : value;
     }
 
+    private List<String> ranked(Map<String,Double> scores, int limit) {
+        List<Candidate> candidates = new ArrayList<>();
+        for (Map.Entry<String,Double> entry : scores.entrySet()) {
+            if (!entry.getKey().isEmpty()) candidates.add(new Candidate(entry.getKey(), entry.getValue()));
+        }
+        candidates.sort((a,b) -> Double.compare(b.score, a.score));
+        List<String> result = new ArrayList<>();
+        for (Candidate candidate : candidates) {
+            if (!result.contains(candidate.word)) result.add(candidate.word);
+            if (result.size() >= limit) break;
+        }
+        if (result.isEmpty()) result.addAll(Arrays.asList("the", "and", "you"));
+        return result;
+    }
+
     private void loadWords(Context context) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(context.getAssets().open("starter_words.txt")))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String word = clean(line);
                 if (word.length() < 2 || rank.containsKey(word)) continue;
-                rank.put(word, words.size());
-                words.add(word);
+                rank.put(word, words.size()); words.add(word);
             }
         } catch (IOException ignored) {
             Collections.addAll(words, "the","and","you","that","this","with","have","from","will","your","about","there","what","when","where","which","would","could","should","please","thanks","hello","good","great","keyboard","android");
@@ -148,32 +183,21 @@ public final class SuggestionEngine {
     }
 
     private void loadEmoji() {
-        emoji.put("happy", Arrays.asList("😊","😄","🙂"));
-        emoji.put("love", Arrays.asList("❤️","😍","🥰"));
-        emoji.put("laugh", Arrays.asList("😂","🤣","😆"));
-        emoji.put("sad", Arrays.asList("😢","😭","☹️"));
-        emoji.put("angry", Arrays.asList("😠","😡","🤬"));
-        emoji.put("thanks", Arrays.asList("🙏","😊","🤝"));
-        emoji.put("thank", Arrays.asList("🙏","😊","🤝"));
-        emoji.put("good", Arrays.asList("👍","✅","👌"));
-        emoji.put("fire", Arrays.asList("🔥","🚒","❤️‍🔥"));
-        emoji.put("money", Arrays.asList("💰","💵","🤑"));
-        emoji.put("birthday", Arrays.asList("🎂","🎉","🥳"));
-        emoji.put("work", Arrays.asList("💼","🧑‍💻","✅"));
-        emoji.put("okay", Arrays.asList("👌","👍","✅"));
-        emoji.put("yes", Arrays.asList("✅","👍","💯"));
+        emoji.put("happy", Arrays.asList("😊","😄","🙂")); emoji.put("love", Arrays.asList("❤️","😍","🥰"));
+        emoji.put("laugh", Arrays.asList("😂","🤣","😆")); emoji.put("sad", Arrays.asList("😢","😭","☹️"));
+        emoji.put("angry", Arrays.asList("😠","😡","🤬")); emoji.put("thanks", Arrays.asList("🙏","😊","🤝"));
+        emoji.put("thank", Arrays.asList("🙏","😊","🤝")); emoji.put("good", Arrays.asList("👍","✅","👌"));
+        emoji.put("fire", Arrays.asList("🔥","🚒","❤️‍🔥")); emoji.put("money", Arrays.asList("💰","💵","🤑"));
+        emoji.put("birthday", Arrays.asList("🎂","🎉","🥳")); emoji.put("work", Arrays.asList("💼","🧑‍💻","✅"));
+        emoji.put("okay", Arrays.asList("👌","👍","✅")); emoji.put("yes", Arrays.asList("✅","👍","💯"));
         emoji.put("no", Arrays.asList("❌","🙅","👎"));
     }
 
     private void addNextWords(Map<String,Double> scores, String previous, PersonalLexicon personal) {
         for (String word : personal.nextWords(previous, 8)) addScore(scores, word, 2_200_000 + personal.bigramBoost(previous, word) * 20_000);
         List<String> defaults = bigrams.get(previous);
-        if (defaults != null) {
-            for (int i = 0; i < defaults.size(); i++) addScore(scores, defaults.get(i), 1_500_000 - i * 40_000);
-        }
-        if (scores.isEmpty()) {
-            addScore(scores, "the", 500_000); addScore(scores, "and", 490_000); addScore(scores, "you", 480_000);
-        }
+        if (defaults != null) for (int i = 0; i < defaults.size(); i++) addScore(scores, defaults.get(i), 1_500_000 - i * 40_000);
+        if (scores.isEmpty()) { addScore(scores, "the", 500_000); addScore(scores, "and", 490_000); addScore(scores, "you", 480_000); }
     }
 
     private void addProfileWords(Map<String,Double> scores, String prefix, ProfileManager.Profile profile) {
@@ -192,9 +216,7 @@ public final class SuggestionEngine {
         scores.put(word, Math.max(score, scores.getOrDefault(word, Double.NEGATIVE_INFINITY)));
     }
 
-    private void putBigram(String previous, String... next) {
-        bigrams.put(previous, Arrays.asList(next));
-    }
+    private void putBigram(String previous, String... next) { bigrams.put(previous, Arrays.asList(next)); }
 
     private static String applyDialect(String word, String dialect) {
         if (dialect == null) return word;
@@ -202,15 +224,9 @@ public final class SuggestionEngine {
         boolean british = d.contains("british") || d.contains("canadian") || d.contains("nigerian");
         if (!british) return word;
         switch (word) {
-            case "color": return "colour";
-            case "favorite": return "favourite";
-            case "organize": return "organise";
-            case "organization": return "organisation";
-            case "center": return "centre";
-            case "behavior": return "behaviour";
-            case "analyze": return "analyse";
-            case "license": return "licence";
-            default: return word;
+            case "color": return "colour"; case "favorite": return "favourite"; case "organize": return "organise";
+            case "organization": return "organisation"; case "center": return "centre"; case "behavior": return "behaviour";
+            case "analyze": return "analyse"; case "license": return "licence"; default: return word;
         }
     }
 
@@ -219,15 +235,56 @@ public final class SuggestionEngine {
         return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z'’-]", "").trim();
     }
 
+    private static String collapsePath(List<String> path) {
+        StringBuilder builder = new StringBuilder();
+        if (path == null) return "";
+        for (String item : path) {
+            String clean = clean(item);
+            if (clean.isEmpty()) continue;
+            char value = clean.charAt(0);
+            if (builder.length() == 0 || builder.charAt(builder.length() - 1) != value) builder.append(value);
+        }
+        return builder.toString();
+    }
+
+    private static String collapseLetters(String value) {
+        String clean = clean(value); StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < clean.length(); index++) {
+            char c = clean.charAt(index);
+            if (builder.length() == 0 || builder.charAt(builder.length() - 1) != c) builder.append(c);
+        }
+        return builder.toString();
+    }
+
+    private static int subsequenceMissing(String word, String path) {
+        int wordIndex = 0, pathIndex = 0;
+        while (wordIndex < word.length() && pathIndex < path.length()) {
+            if (word.charAt(wordIndex) == path.charAt(pathIndex)) wordIndex++;
+            pathIndex++;
+        }
+        return word.length() - wordIndex;
+    }
+
+    private static int levenshtein(String a, String b) {
+        int[] previous = new int[b.length() + 1]; int[] current = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) previous[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            current[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                current[j] = Math.min(Math.min(previous[j] + 1, current[j - 1] + 1), previous[j - 1] + cost);
+            }
+            int[] swap = previous; previous = current; current = swap;
+        }
+        return previous[b.length()];
+    }
+
     private static boolean isKeyboardNearMiss(String a, String b) {
         if (a.length() != b.length()) return false;
-        String[] rows = {"qwertyuiop", "asdfghjkl", "zxcvbnm"};
-        int differences = 0;
+        String[] rows = {"qwertyuiop", "asdfghjkl", "zxcvbnm"}; int differences = 0;
         for (int i = 0; i < a.length(); i++) {
             if (a.charAt(i) == b.charAt(i)) continue;
-            differences++;
-            if (differences > 1) return false;
-            if (!adjacent(a.charAt(i), b.charAt(i), rows)) return false;
+            differences++; if (differences > 1 || !adjacent(a.charAt(i), b.charAt(i), rows)) return false;
         }
         return differences == 1;
     }
@@ -250,9 +307,7 @@ public final class SuggestionEngine {
             for (int j = 1; j <= b.length(); j++) {
                 int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
                 d[i][j] = Math.min(Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1), d[i - 1][j - 1] + cost);
-                if (i > 1 && j > 1 && a.charAt(i - 1) == b.charAt(j - 2) && a.charAt(i - 2) == b.charAt(j - 1)) {
-                    d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
-                }
+                if (i > 1 && j > 1 && a.charAt(i - 1) == b.charAt(j - 2) && a.charAt(i - 2) == b.charAt(j - 1)) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
                 rowMin = Math.min(rowMin, d[i][j]);
             }
             if (rowMin > max) return max + 1;
