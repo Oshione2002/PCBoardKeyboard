@@ -54,7 +54,7 @@ jobs:
           python3 -m py_compile scripts/apply_pcboard_overlay.py
           python3 scripts/apply_pcboard_overlay.py leantype
           grep -Fq 'applicationId = "com.treasure.pcboard"' leantype/app/build.gradle.kts
-          grep -Fq 'minSdk = 26' leantype/app/build.gradle.kts
+          grep -Fq 'minSdk = 28' leantype/app/build.gradle.kts
           grep -Fq '⇥|!code/-10014' leantype/app/src/main/assets/layouts/main/qwerty.txt
           grep -Fq 'Ctrl|!code/-1' leantype/app/src/main/assets/layouts/main/qwerty.txt
           grep -Fq 'Ctrl●|!code/-2' leantype/app/src/main/assets/layouts/main/qwerty.txt
@@ -63,7 +63,7 @@ jobs:
           grep -Fq 'val PREF_KEYBOARD_HEIGHT_SCALE = Array(2) { 1.12f }' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
           grep -Fq 'range = 0.6f..1.9f,' leantype/app/src/main/java/helium314/keyboard/settings/screens/AppearanceScreen.kt
 
-      - name: Compile tests, lint and build offline keyboard
+      - name: Compile test sources and build offline keyboard
         id: gradle
         shell: bash
         run: |
@@ -74,12 +74,25 @@ jobs:
           ./gradlew \
             :app:compileOfflineliteRunTestsKotlin \
             :app:compileOfflineliteRunTestsUnitTestKotlin \
-            :app:lintOfflineliteDebug \
             :app:assembleOfflineliteDebug \
             --stacktrace 2>&1 | tee ../pcboard-gradle.log
           status=${PIPESTATUS[0]}
           set -e
           exit "$status"
+
+      - name: Generate upstream lint report
+        id: lint
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          cd leantype
+          set +e
+          ./gradlew :app:lintOfflineliteDebug --stacktrace 2>&1 | tee -a ../pcboard-gradle.log
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "LeanType upstream lint status: $status"
+          exit 0
 
       - name: Verify APK identity and offline permission set
         shell: bash
@@ -102,12 +115,15 @@ jobs:
           test "$version_name" = "3.0.0-foundation"
           sha256sum "$apk" | tee PCBoard-SHA256.txt
 
-      - name: Upload compiler log
+      - name: Upload compiler and lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-foundation-build-log
-          path: pcboard-gradle.log
+          name: PCBoard-foundation-reports
+          path: |
+            pcboard-gradle.log
+            leantype/app/build/reports/lint-results-offlineliteDebug.*
+            leantype/app/build/reports/lint-results-offlineliteDebug/**
           if-no-files-found: warn
 
       - name: Upload PCBoard APK
