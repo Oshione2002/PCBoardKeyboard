@@ -1,72 +1,81 @@
 # PCBoard Keyboard
 
-PCBoard is an original Android input method focused on modern everyday typing and desktop-style productivity. It keeps a familiar mobile layout while adding dedicated **Ctrl** and **Tab** keys, editing tools and task-specific profiles.
+PCBoard is a fully offline Android keyboard focused on comfortable mobile typing and desktop-style productivity. Version 3.0 replaces the earlier experimental keyboard engine with a reproducible fork overlay based on LeanType, HeliBoard, OpenBoard and AOSP LatinIME.
 
-## Version 2.0
+## Version 3.0 foundation
 
-### Typing and layout
-- QWERTY, number, phone, email, URL and symbols layouts
-- Dedicated Ctrl and Tab
-- Shift, double-tap Caps Lock and visible modifier states
-- Automatic capitalisation and double-space full stop
-- Adaptive Enter action
-- Long-press symbols on every letter and number key
-- Accented-character alternatives and visible symbol hints
-- Key preview popups
-- Hold Backspace to repeat and swipe left to delete a word
-- Swipe across Space to move the cursor
-- Swipe down to hide the keyboard
-- Adjustable keyboard height from 90% to 180%, with a taller 118% default
-- Configurable bottom safety gap to avoid Android navigation and keyboard controls
-- Number row, themes, vibration and sound controls
-- One-handed left, right and compact modes
-- Editable toolbar order, bottom modifier and punctuation keys
+The foundation build inherits the mature upstream implementation of:
 
-### Smart typing
-- Offline glide typing with ranked word candidates
-- 1,600+ word offline starter lexicon
-- Prefix and next-word suggestions
-- Ranked autocorrection with Damerau-Levenshtein distance
-- Transposed-letter and nearby-key correction
-- Local personal word and phrase learning
-- British, Canadian, US and Nigerian English variants
-- Nigerian Pidgin starter vocabulary
-- Emoji suggestions and autocorrection undo
+- offline dictionary suggestions and autocorrection
+- next-word prediction and personal dictionaries
+- gesture typing with a local fallback engine
+- clipboard history, search, pinning and text expansion
+- emoji search and suggestion support
+- text-editing and touchpad modes
+- one-handed, split and floating layouts
+- Material You themes and custom colours
+- backup and restore
+- password-field and incognito protections
 
-### Productivity and rich input
-- Clipboard history captured only when its panel is opened
-- One-hour expiry for unpinned clipboard items
-- Cut, copy, paste, select all, undo and redo
-- Arrow keys, forward delete and Escape
-- Terminal, coding and spreadsheet profiles
-- Automatic profile detection by foreground app package
-- Quick-text snippets editable by the user
-- Emoji and kaomoji panel
-- Clipboard image and rich-content insertion in compatible applications
-- Android system voice typing, with partial results when supported
-- Android 12+ system translation for selected text or the current sentence when available
-- Locally trainable handwriting gestures for letters, words, symbols and shortcuts
+PCBoard adds these defaults and modifications:
 
-### Privacy and accessibility
-- No PCBoard internet permission and no PCBoard cloud account
-- Microphone permission is requested only for voice typing
-- No typed-text upload by PCBoard
-- No learning in password fields
-- Respects `IME_FLAG_NO_PERSONALIZED_LEARNING`
-- Incognito mode
-- Clear learned data, clipboard history and handwriting training
-- Individual key focus, content descriptions and 48dp minimum touch targets
+- package name `com.treasure.pcboard`
+- PCBoard branding and adaptive launcher icon
+- offline-lite build with no `INTERNET` permission
+- Ctrl and Tab integrated into the main QWERTY layout
+- long-press numbers, symbols and accented characters
+- number row enabled by default
+- split toolbar and suggestions enabled by default
+- autocorrection enabled by default
+- taller portrait and landscape keyboard defaults
+- height control extended to 60%–190%
+- increased bottom safety padding for Android navigation and keyboard controls
+- network-dependent download controls disabled
 
-## Intentionally excluded
-Version 2.0 does not add multiple language packs, encrypted cloud synchronisation, AI proofreading or rewriting, or a downloadable model manager.
+## Main layout
 
-## Build the APK
-Open **Actions**, select **Build APK**, run the workflow, then download the `PCBoard-debug-apk` artifact.
+```text
+q  w  e  r  t  y  u  i  o  p
 
-## Capability notes
-- Glide typing is an offline lexicon-based decoder, not a proprietary neural model.
-- Voice typing depends on the speech-recognition service installed on the device. That system service may use on-device or network processing.
-- Translation requires Android 12 or later and an available device translation service.
-- Handwriting recognises gestures trained locally by the user. It is not general handwriting OCR.
-- Image or rich-content insertion works only when the receiving application advertises a compatible MIME type.
-- PCBoard does not claim feature parity with Gboard, SwiftKey or Samsung Keyboard.
+⇥  a  s  d  f  g  h  j  k  l
+
+Ctrl  z  x  c  v  b  n  m
+```
+
+LeanType's layout engine adds Shift, Backspace, symbols, comma, space, period and the adaptive Enter key around these rows.
+
+## Reproducible upstream build
+
+The repository stores a pinned LeanType commit and a small reviewed PCBoard overlay rather than copying hundreds of megabytes of generated and upstream files.
+
+The GitHub workflow:
+
+1. fetches the exact commit in `upstream/LEANTYPE_COMMIT`
+2. applies `scripts/apply_pcboard_overlay.py`
+3. runs LeanType's unit tests
+4. runs Android lint
+5. builds the `offlineliteDebug` APK
+6. rejects an APK that requests `android.permission.INTERNET`
+7. uploads the APK and SHA-256 checksum
+
+## Build locally
+
+```bash
+git clone https://github.com/Oshione2002/PCBoardKeyboard.git
+cd PCBoardKeyboard
+
+UPSTREAM_COMMIT=$(cat upstream/LEANTYPE_COMMIT)
+git clone https://github.com/LeanBitLab/LeanType.git leantype
+git -C leantype checkout "$UPSTREAM_COMMIT"
+python3 scripts/apply_pcboard_overlay.py leantype
+cd leantype
+./gradlew :app:testOfflineliteDebugUnitTest :app:lintOfflineliteDebug :app:assembleOfflineliteDebug
+```
+
+## Licence and attribution
+
+PCBoard's fork modifications are distributed under GPL-3.0. LeanType, HeliBoard and OpenBoard licence notices must remain available with redistributed source. AOSP-derived portions retain their applicable Apache 2.0 notices.
+
+## Current stage
+
+This branch is the PCBoard 3.0 foundation. The build must pass CI and be tested on the Tecno Camon 30 before it replaces the current main release. Later stages will refine the toolbar, productivity profiles, Nigerian English and Pidgin dictionaries, touch adaptation and optional specialised offline prediction.
