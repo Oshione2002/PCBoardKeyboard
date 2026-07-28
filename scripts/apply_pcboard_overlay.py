@@ -74,16 +74,14 @@ def main() -> None:
     appearance = upstream / "app/src/main/java/helium314/keyboard/settings/screens/AppearanceScreen.kt"
     replace_required(appearance, "range = 0.3f..1.5f,", "range = 0.6f..1.9f,")
 
-    # Replace the built-in QWERTY letters with the PCBoard arrangement. LeanType
-    # continues to inject Shift, Backspace, symbols, comma, space, period and the
-    # adaptive action key around these rows.
+    # LeanType injects Shift, Backspace, symbols, comma, space, period and the
+    # adaptive action key around these character rows.
     shutil.copyfile(
         ROOT / "overlays/qwerty.txt",
         upstream / "app/src/main/assets/layouts/main/qwerty.txt",
     )
 
-    # Rebrand user-visible strings while preserving translations and upstream
-    # source package names. Product identity is not used as a code namespace.
+    # Rebrand user-visible strings while preserving upstream package namespaces.
     for strings in (upstream / "app/src/main/res").glob("values*/strings.xml"):
         text = strings.read_text(encoding="utf-8")
         text = text.replace("LeanType", "PCBoard")
@@ -95,8 +93,8 @@ def main() -> None:
     manifest_text = manifest_text.replace('android:usesCleartextTraffic="true"', 'android:usesCleartextTraffic="false"')
     manifest.write_text(manifest_text, encoding="utf-8")
 
-    # Modern PCBoard adaptive icon for Android 8+. The legacy raster launcher
-    # assets are retained only for old Android versions.
+    # Modern PCBoard adaptive icon for Android 8+. Legacy raster assets remain
+    # only as a compatibility fallback for older Android versions.
     drawable = upstream / "app/src/main/res/drawable"
     (drawable / "ic_pcboard_mark.xml").write_text(
         '''<?xml version="1.0" encoding="utf-8"?>
@@ -135,7 +133,7 @@ def main() -> None:
 
     notice = upstream / "PCBOARD_FORK_NOTICE.md"
     notice.write_text(
-        """# PCBoard fork notice\n\n"
+        "# PCBoard fork notice\n\n"
         "PCBoard Keyboard is built from LeanType, HeliBoard, OpenBoard and AOSP "
         "LatinIME under their respective licences. PCBoard modifications are "
         "distributed under GPL-3.0. The pinned upstream revision is recorded in "
