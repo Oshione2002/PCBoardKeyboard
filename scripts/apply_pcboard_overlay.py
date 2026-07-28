@@ -49,7 +49,7 @@ def main() -> None:
     regex_required(
         build,
         r'(create\("offlinelite"\)\s*\{.*?dimension\s*=\s*"privacy"\s*)applicationIdSuffix\s*=\s*"\.offlinelite"',
-        r"\1// PCBoard uses the base application id for its offline-only release\n            minSdk = 26",
+        r"\1// PCBoard uses the base application id for its offline-only release\n            minSdk = 28",
         flags=re.S,
     )
     replace_required(build, "$number-LeanType_", "$number-PCBoard_")
