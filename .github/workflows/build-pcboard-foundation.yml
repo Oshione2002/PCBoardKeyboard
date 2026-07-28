@@ -1,0 +1,105 @@
+name: Build PCBoard Foundation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/leantype-pcboard-foundation
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out PCBoard overlay
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned NDK
+        run: sdkmanager "ndk;28.0.13004108"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Fetch pinned LeanType source
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_commit="$(tr -d '\r\n' < upstream/LEANTYPE_COMMIT)"
+          git init leantype
+          git -C leantype remote add origin https://github.com/LeanBitLab/LeanType.git
+          git -C leantype fetch --depth 1 origin "$upstream_commit"
+          git -C leantype checkout --detach FETCH_HEAD
+          test "$(git -C leantype rev-parse HEAD)" = "$upstream_commit"
+
+      - name: Apply PCBoard overlay
+        run: |
+          python3 -m py_compile scripts/apply_pcboard_overlay.py
+          python3 scripts/apply_pcboard_overlay.py leantype
+
+      - name: Build, test and lint offline keyboard
+        id: gradle
+        shell: bash
+        run: |
+          set -o pipefail
+          cd leantype
+          chmod +x gradlew
+          set +e
+          ./gradlew \
+            :app:testOfflineliteDebugUnitTest \
+            :app:lintOfflineliteDebug \
+            :app:assembleOfflineliteDebug \
+            --stacktrace 2>&1 | tee ../pcboard-gradle.log
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
+
+      - name: Verify APK identity and offline permission set
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find leantype/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          test -n "$apk"
+          echo "APK=$apk"
+          permissions="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest permissions "$apk")"
+          echo "$permissions"
+          if grep -q 'android.permission.INTERNET' <<<"$permissions"; then
+            echo "PCBoard offline APK unexpectedly requests INTERNET" >&2
+            exit 1
+          fi
+          package_name="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest application-id "$apk")"
+          echo "Package: $package_name"
+          test "$package_name" = "com.treasure.pcboard.debug"
+          sha256sum "$apk" | tee PCBoard-SHA256.txt
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCBoard-foundation-build-log
+          path: pcboard-gradle.log
+          if-no-files-found: warn
+
+      - name: Upload PCBoard APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCBoard-3.0-foundation-apk
+          path: |
+            leantype/app/build/outputs/apk/**/*.apk
+            PCBoard-SHA256.txt
+          if-no-files-found: error
