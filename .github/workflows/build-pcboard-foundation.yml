@@ -1,4 +1,4 @@
-name: Build PCBoard Foundation
+name: Build PCBoard LeanType Edition
 
 on:
   workflow_dispatch:
@@ -47,23 +47,38 @@ jobs:
           git -C leantype checkout --detach FETCH_HEAD
           test "$(git -C leantype rev-parse HEAD)" = "$upstream_commit"
 
-      - name: Apply and validate PCBoard overlay
+      - name: Apply and validate PCBoard layout overlay
         shell: bash
         run: |
           set -euo pipefail
           python3 -m py_compile scripts/apply_pcboard_overlay.py
           python3 scripts/apply_pcboard_overlay.py leantype
-          grep -Fq 'applicationId = "com.treasure.pcboard"' leantype/app/build.gradle.kts
-          grep -Fq 'minSdk = 28' leantype/app/build.gradle.kts
-          grep -Fq '⇥|!code/-10014' leantype/app/src/main/assets/layouts/main/qwerty.txt
-          grep -Fq 'Ctrl|!code/-1' leantype/app/src/main/assets/layouts/main/qwerty.txt
-          grep -Fq 'Ctrl●|!code/-2' leantype/app/src/main/assets/layouts/main/qwerty.txt
-          grep -Fq 'const val PREF_AUTO_CORRECTION = true' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
-          grep -Fq 'const val PREF_SHOW_NUMBER_ROW = true' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
-          grep -Fq 'val PREF_KEYBOARD_HEIGHT_SCALE = Array(2) { 1.12f }' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
-          grep -Fq 'range = 0.6f..1.9f,' leantype/app/src/main/java/helium314/keyboard/settings/screens/AppearanceScreen.kt
 
-      - name: Compile test sources and build offline keyboard
+          grep -Fq 'applicationId = "com.treasure.pcboard"' leantype/app/build.gradle.kts
+          grep -Fq 'versionName = "3.0.1-layout"' leantype/app/build.gradle.kts
+
+          # The QWERTY asset remains LeanType's normal three letter rows.
+          test "$(grep -c '^$' leantype/app/src/main/assets/layouts/main/qwerty.txt)" -eq 2
+          ! grep -Fq 'Ctrl' leantype/app/src/main/assets/layouts/main/qwerty.txt
+          ! grep -Fq '⇥' leantype/app/src/main/assets/layouts/main/qwerty.txt
+
+          # PCBoard changes only the functional geometry on the primary keyboard.
+          for layout in functional_keys.json functional_keys_tablet.json; do
+            file="leantype/app/src/main/assets/layouts/functional/$layout"
+            grep -Fq '"label": "tab", "width": 0.075' "$file"
+            grep -Fq '"label": "ctrl", "width": 0.15' "$file"
+            grep -Fq '"label": "delete", "width": 0.15' "$file"
+            grep -Fq '"label": "action", "width": 0.15' "$file"
+            ! grep -Fq '"label": "emoji"' "$file"
+          done
+
+          # Guard against accidental changes to LeanType defaults and feature set.
+          grep -Fq 'const val PREF_AUTO_CORRECTION = false' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+          grep -Fq 'const val PREF_SHOW_NUMBER_ROW = false' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+          grep -Fq 'val PREF_KEYBOARD_HEIGHT_SCALE = Array(2) { 0.77f }' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+          grep -Fq 'const val PREF_DISABLE_NETWORK = false' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+
+      - name: Compile test sources and build internet-enabled AI keyboard
         id: gradle
         shell: bash
         run: |
@@ -72,9 +87,9 @@ jobs:
           chmod +x gradlew
           set +e
           ./gradlew \
-            :app:compileOfflineliteRunTestsKotlin \
-            :app:compileOfflineliteRunTestsUnitTestKotlin \
-            :app:assembleOfflineliteDebug \
+            :app:compileStandardfullRunTestsKotlin \
+            :app:compileStandardfullRunTestsUnitTestKotlin \
+            :app:assembleStandardfullDebug \
             --stacktrace 2>&1 | tee ../pcboard-gradle.log
           status=${PIPESTATUS[0]}
           set -e
@@ -88,49 +103,50 @@ jobs:
           set -o pipefail
           cd leantype
           set +e
-          ./gradlew :app:lintOfflineliteDebug --stacktrace 2>&1 | tee -a ../pcboard-gradle.log
+          ./gradlew :app:lintStandardfullDebug --stacktrace 2>&1 | tee -a ../pcboard-gradle.log
           status=${PIPESTATUS[0]}
           echo "status=$status" >> "$GITHUB_OUTPUT"
           echo "LeanType upstream lint status: $status"
           exit 0
 
-      - name: Verify APK identity and offline permission set
+      - name: Verify APK identity and internet permission
         shell: bash
         run: |
           set -euo pipefail
-          apk="$(find leantype/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          apk="$(find leantype/app/build/outputs/apk/standardfull/debug -type f -name '*.apk' | head -n 1)"
           test -n "$apk"
           echo "APK=$apk"
+
           permissions="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest permissions "$apk")"
           echo "$permissions"
-          if grep -q 'android.permission.INTERNET' <<<"$permissions"; then
-            echo "PCBoard offline APK unexpectedly requests INTERNET" >&2
-            exit 1
-          fi
+          grep -q 'android.permission.INTERNET' <<<"$permissions"
+
           package_name="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest application-id "$apk")"
           echo "Package: $package_name"
           test "$package_name" = "com.treasure.pcboard.debug"
+
           version_name="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest version-name "$apk")"
           echo "Version: $version_name"
-          test "$version_name" = "3.0.0-foundation"
+          test "$version_name" = "3.0.1-layout"
+
           sha256sum "$apk" | tee PCBoard-SHA256.txt
 
       - name: Upload compiler and lint reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-foundation-reports
+          name: PCBoard-LeanType-edition-reports
           path: |
             pcboard-gradle.log
-            leantype/app/build/reports/lint-results-offlineliteDebug.*
-            leantype/app/build/reports/lint-results-offlineliteDebug/**
+            leantype/app/build/reports/lint-results-standardfullDebug.*
+            leantype/app/build/reports/lint-results-standardfullDebug/**
           if-no-files-found: warn
 
       - name: Upload PCBoard APK
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-3.0-foundation-apk
+          name: PCBoard-3.0.1-LeanType-AI-layout-apk
           path: |
-            leantype/app/build/outputs/apk/**/*.apk
+            leantype/app/build/outputs/apk/standardfull/debug/*.apk
             PCBoard-SHA256.txt
           if-no-files-found: error
