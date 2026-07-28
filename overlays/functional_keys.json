@@ -1,6 +1,6 @@
 [
   [
-    { "$": "keyboard_state_selector", "alphabet": { "label": "tab", "width": 0.10 } },
+    { "$": "keyboard_state_selector", "alphabet": { "label": "tab", "width": 0.12 } },
     { "type": "placeholder" }
   ],
   [
