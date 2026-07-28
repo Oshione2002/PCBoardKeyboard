@@ -1,10 +1,9 @@
-name: Build APK
+name: Legacy PCBoard 2.0 Build
+
+# Retained temporarily for manual comparison only. PCBoard 3.0 is built by
+# build-pcboard-foundation.yml from the pinned LeanType foundation.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
   build:
@@ -20,7 +19,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Build debug APK
+      - name: Build legacy debug APK
         id: android_build
         shell: bash
         run: |
@@ -33,13 +32,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-build-log
+          name: PCBoard-legacy-build-log
           path: android-build.log
           if-no-files-found: error
-      - name: Upload APK
+      - name: Upload legacy APK
         if: steps.android_build.outputs.status == '0'
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-debug-apk
+          name: PCBoard-2.0-legacy-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
