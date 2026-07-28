@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - agent/leantype-pcboard-foundation
+      - agent/pcboard-layout-3-0-2
   pull_request:
     branches:
       - main
@@ -55,22 +55,42 @@ jobs:
           python3 scripts/apply_pcboard_overlay.py leantype
 
           grep -Fq 'applicationId = "com.treasure.pcboard"' leantype/app/build.gradle.kts
-          grep -Fq 'versionName = "3.0.1-layout"' leantype/app/build.gradle.kts
+          grep -Fq 'versionName = "3.0.2-layout"' leantype/app/build.gradle.kts
 
-          # The QWERTY asset remains LeanType's normal three letter rows.
-          test "$(grep -c '^$' leantype/app/src/main/assets/layouts/main/qwerty.txt)" -eq 2
-          ! grep -Fq 'Ctrl' leantype/app/src/main/assets/layouts/main/qwerty.txt
-          ! grep -Fq '⇥' leantype/app/src/main/assets/layouts/main/qwerty.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
 
-          # PCBoard changes only the functional geometry on the primary keyboard.
-          for layout in functional_keys.json functional_keys_tablet.json; do
-            file="leantype/app/src/main/assets/layouts/functional/$layout"
-            grep -Fq '"label": "tab", "width": 0.075' "$file"
-            grep -Fq '"label": "ctrl", "width": 0.15' "$file"
-            grep -Fq '"label": "delete", "width": 0.15' "$file"
-            grep -Fq '"label": "action", "width": 0.15' "$file"
-            ! grep -Fq '"label": "emoji"' "$file"
-          done
+          root = Path("leantype/app/src/main/assets/layouts")
+
+          qwerty = (root / "main/qwerty.txt").read_text(encoding="utf-8")
+          rows = [row.splitlines() for row in qwerty.strip().split("\n\n")]
+          assert rows == [list("qwertyuiop"), list("asdfghjkl"), list("zxcvbnm")]
+
+          pc = json.loads((root / "main/pcqwerty.json").read_text(encoding="utf-8"))
+          assert len(pc) == 4
+          assert [key["label"] for key in pc[1]] == list("qwertyuiop")
+          assert [key["label"] for key in pc[2]] == list("asdfghjkl")
+          assert [key["label"] for key in pc[3]] == list("zxcvbnm")
+          assert not any(key.get("label") in {"!", "?"} for key in pc[3])
+
+          for name in ("functional_keys.json", "functional_keys_tablet.json"):
+              data = json.loads((root / "functional" / name).read_text(encoding="utf-8"))
+              tab = data[0][0]["alphabet"]
+              assert tab["label"] == "tab" and tab["width"] == 0.10
+              assert data[1][0]["label"] == "shift"
+              assert data[1][2]["label"] == "delete"
+              bottom = data[2]
+              assert bottom[0]["alphabet"]["label"] == "ctrl"
+              assert bottom[1]["default"]["label"] == "comma"
+              switch = bottom[2]["alphabet"]
+              assert switch["label"] == "?1"
+              assert switch["code"] == -10001
+              assert switch["width"] == 0.10
+              assert bottom[-3]["label"] == "space"
+              assert bottom[-2]["label"] == "period"
+              assert bottom[-1]["label"] == "action"
+          PY
 
           # Guard against accidental changes to LeanType defaults and feature set.
           grep -Fq 'const val PREF_AUTO_CORRECTION = false' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
@@ -127,7 +147,7 @@ jobs:
 
           version_name="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest version-name "$apk")"
           echo "Version: $version_name"
-          test "$version_name" = "3.0.1-layout"
+          test "$version_name" = "3.0.2-layout"
 
           sha256sum "$apk" | tee PCBoard-SHA256.txt
 
@@ -135,7 +155,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-LeanType-edition-reports
+          name: PCBoard-3.0.2-reports
           path: |
             pcboard-gradle.log
             leantype/app/build/reports/lint-results-standardfullDebug.*
@@ -145,7 +165,7 @@ jobs:
       - name: Upload PCBoard APK
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-3.0.1-LeanType-AI-layout-apk
+          name: PCBoard-3.0.2-LeanType-AI-layout-apk
           path: |
             leantype/app/build/outputs/apk/standardfull/debug/*.apk
             PCBoard-SHA256.txt
