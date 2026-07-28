@@ -48,20 +48,24 @@ def main() -> None:
         'applicationId = "com.leanbitlab.leantype"',
         'applicationId = "com.treasure.pcboard"',
     )
-    regex_required(build, r"versionCode\s*=\s*\d+", "versionCode = 3001")
+    regex_required(build, r"versionCode\s*=\s*\d+", "versionCode = 3002")
     regex_required(
         build,
         r'versionName\s*=\s*"[^"]+"',
-        'versionName = "3.0.1-layout"',
+        'versionName = "3.0.2-layout"',
     )
     replace_required(build, "$number-LeanType_", "$number-PCBoard_")
 
     # Keep LeanType's dictionaries, prediction, correction, toolbar, clipboard,
-    # themes, downloads and AI behaviour. Replace only the primary QWERTY and
-    # functional-key geometry approved for PCBoard.
+    # themes, downloads and AI behaviour. Replace only the primary QWERTY,
+    # PC-QWERTY and functional-key geometry approved for PCBoard.
     shutil.copyfile(
         ROOT / "overlays/qwerty.txt",
         upstream / "app/src/main/assets/layouts/main/qwerty.txt",
+    )
+    shutil.copyfile(
+        ROOT / "overlays/pcqwerty.json",
+        upstream / "app/src/main/assets/layouts/main/pcqwerty.json",
     )
     for target in ("functional_keys.json", "functional_keys_tablet.json"):
         shutil.copyfile(
