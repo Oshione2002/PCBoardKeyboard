@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - agent/pcboard-layout-3-0-2
+      - agent/pcboard-layout-3-0-3
   pull_request:
     branches:
       - main
@@ -47,7 +47,7 @@ jobs:
           git -C leantype checkout --detach FETCH_HEAD
           test "$(git -C leantype rev-parse HEAD)" = "$upstream_commit"
 
-      - name: Apply and validate PCBoard layout overlay
+      - name: Apply and validate PCBoard runtime layout overlay
         shell: bash
         run: |
           set -euo pipefail
@@ -55,7 +55,11 @@ jobs:
           python3 scripts/apply_pcboard_overlay.py leantype
 
           grep -Fq 'applicationId = "com.treasure.pcboard"' leantype/app/build.gradle.kts
-          grep -Fq 'versionName = "3.0.2-layout"' leantype/app/build.gradle.kts
+          grep -Fq 'versionName = "3.0.3-layout"' leantype/app/build.gradle.kts
+
+          locale_infos='leantype/app/src/main/java/helium314/keyboard/keyboard/internal/keyboard_parser/LocaleKeyboardInfos.kt'
+          grep -Fq 'else -> emptyList<KeyData>() to emptyList() // PCBoard: punctuation remains on long-press only' "$locale_infos"
+          ! grep -Fq 'else -> emptyList<KeyData>() to listOf("!".toTextKey' "$locale_infos"
 
           python3 - <<'PY'
           import json
@@ -63,21 +67,28 @@ jobs:
 
           root = Path("leantype/app/src/main/assets/layouts")
 
-          qwerty = (root / "main/qwerty.txt").read_text(encoding="utf-8")
-          rows = [row.splitlines() for row in qwerty.strip().split("\n\n")]
-          assert rows == [list("qwertyuiop"), list("asdfghjkl"), list("zxcvbnm")]
+          qwerty = json.loads((root / "main/qwerty.txt").read_text(encoding="utf-8"))
+          assert [key["label"] for key in qwerty[0]] == list("qwertyuiop")
+          assert [key["label"] for key in qwerty[1]] == list("asdfghjkl")
+          assert [key["label"] for key in qwerty[2]] == list("zxcvbnm")
+          assert all(key["width"] == 0.10 for key in qwerty[0])
+          assert all(abs(key["width"] - 0.0977778) < 0.000001 for key in qwerty[1])
+          assert all(key["width"] == 0.10 for key in qwerty[2])
 
           pc = json.loads((root / "main/pcqwerty.json").read_text(encoding="utf-8"))
           assert len(pc) == 4
           assert [key["label"] for key in pc[1]] == list("qwertyuiop")
           assert [key["label"] for key in pc[2]] == list("asdfghjkl")
           assert [key["label"] for key in pc[3]] == list("zxcvbnm")
+          assert all(key["width"] == 0.10 for key in pc[1])
+          assert all(abs(key["width"] - 0.0977778) < 0.000001 for key in pc[2])
+          assert all(key["width"] == 0.10 for key in pc[3])
           assert not any(key.get("label") in {"!", "?"} for key in pc[3])
 
           for name in ("functional_keys.json", "functional_keys_tablet.json"):
               data = json.loads((root / "functional" / name).read_text(encoding="utf-8"))
               tab = data[0][0]["alphabet"]
-              assert tab["label"] == "tab" and tab["width"] == 0.10
+              assert tab["label"] == "tab" and tab["width"] == 0.12
               assert data[1][0]["label"] == "shift"
               assert data[1][2]["label"] == "delete"
               bottom = data[2]
@@ -147,7 +158,7 @@ jobs:
 
           version_name="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest version-name "$apk")"
           echo "Version: $version_name"
-          test "$version_name" = "3.0.2-layout"
+          test "$version_name" = "3.0.3-layout"
 
           sha256sum "$apk" | tee PCBoard-SHA256.txt
 
@@ -155,7 +166,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-3.0.2-reports
+          name: PCBoard-3.0.3-reports
           path: |
             pcboard-gradle.log
             leantype/app/build/reports/lint-results-standardfullDebug.*
@@ -165,7 +176,7 @@ jobs:
       - name: Upload PCBoard APK
         uses: actions/upload-artifact@v4
         with:
-          name: PCBoard-3.0.2-LeanType-AI-layout-apk
+          name: PCBoard-3.0.3-LeanType-AI-layout-apk
           path: |
             leantype/app/build/outputs/apk/standardfull/debug/*.apk
             PCBoard-SHA256.txt
