@@ -1,0 +1,46 @@
+[
+  [
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "!", "width": 0.10 }, "default": { "label": "1", "width": 0.10, "popup": { "relevant": [ { "label": "!" }, { "label": "¡" } ] } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "\\@", "width": 0.10 }, "default": { "label": "2", "width": 0.10, "popup": { "main": { "label": "\\@" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "\\#", "width": 0.10 }, "default": { "label": "3", "width": 0.10, "popup": { "main": { "label": "\\#" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "$", "width": 0.10 }, "default": { "label": "4", "width": 0.10, "popup": { "main": { "label": "$" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "\\%", "width": 0.10 }, "default": { "label": "5", "width": 0.10, "popup": { "main": { "label": "\\%" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "^", "width": 0.10 }, "default": { "label": "6", "width": 0.10, "popup": { "main": { "label": "^" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "&", "width": 0.10 }, "default": { "label": "7", "width": 0.10, "popup": { "main": { "label": "&" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "*", "width": 0.10 }, "default": { "label": "8", "width": 0.10, "popup": { "main": { "label": "*" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": "(", "width": 0.10 }, "default": { "label": "9", "width": 0.10, "popup": { "main": { "label": "(" } } } },
+    { "$": "shift_state_selector", "manualOrLocked": { "label": ")", "width": 0.10 }, "default": { "label": "0", "width": 0.10, "popup": { "main": { "label": ")" } } } }
+  ],
+  [
+    { "label": "q", "width": 0.10, "popup": { "main": { "label": "%" } } },
+    { "label": "w", "width": 0.10, "popup": { "main": { "label": "\\" } } },
+    { "label": "e", "width": 0.10, "popup": { "main": { "label": "|" } } },
+    { "label": "r", "width": 0.10, "popup": { "main": { "label": "=" } } },
+    { "label": "t", "width": 0.10, "popup": { "main": { "label": "[" } } },
+    { "label": "y", "width": 0.10, "popup": { "main": { "label": "]" } } },
+    { "label": "u", "width": 0.10, "popup": { "main": { "label": "<" } } },
+    { "label": "i", "width": 0.10, "popup": { "main": { "label": ">" } } },
+    { "label": "o", "width": 0.10, "popup": { "main": { "label": "{" } } },
+    { "label": "p", "width": 0.10, "popup": { "main": { "label": "}" } } }
+  ],
+  [
+    { "label": "a", "width": 0.0977778, "popup": { "main": { "label": "@" } } },
+    { "label": "s", "width": 0.0977778, "popup": { "main": { "label": "#" } } },
+    { "label": "d", "width": 0.0977778, "popup": { "main": { "label": "$$$" } } },
+    { "label": "f", "width": 0.0977778, "popup": { "main": { "label": "_" } } },
+    { "label": "g", "width": 0.0977778, "popup": { "main": { "label": "&" } } },
+    { "label": "h", "width": 0.0977778, "popup": { "main": { "label": "-" } } },
+    { "label": "j", "width": 0.0977778, "popup": { "main": { "label": "+" } } },
+    { "label": "k", "width": 0.0977778, "popup": { "main": { "label": "(" } } },
+    { "label": "l", "width": 0.0977778, "popup": { "main": { "label": ")" } } }
+  ],
+  [
+    { "label": "z", "width": 0.10, "popup": { "main": { "label": "*" } } },
+    { "label": "x", "width": 0.10, "popup": { "main": { "label": "\"" } } },
+    { "label": "c", "width": 0.10, "popup": { "main": { "label": "'" } } },
+    { "label": "v", "width": 0.10, "popup": { "main": { "label": ":" } } },
+    { "label": "b", "width": 0.10, "popup": { "main": { "label": ";" } } },
+    { "label": "n", "width": 0.10, "popup": { "main": { "label": "!" } } },
+    { "label": "m", "width": 0.10, "popup": { "main": { "label": "?" } } }
+  ]
+]
