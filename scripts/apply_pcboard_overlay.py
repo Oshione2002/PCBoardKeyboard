@@ -48,11 +48,11 @@ def main() -> None:
         'applicationId = "com.leanbitlab.leantype"',
         'applicationId = "com.treasure.pcboard"',
     )
-    regex_required(build, r"versionCode\s*=\s*\d+", "versionCode = 3002")
+    regex_required(build, r"versionCode\s*=\s*\d+", "versionCode = 3003")
     regex_required(
         build,
         r'versionName\s*=\s*"[^"]+"',
-        'versionName = "3.0.2-layout"',
+        'versionName = "3.0.3-layout"',
     )
     replace_required(build, "$number-LeanType_", "$number-PCBoard_")
 
@@ -72,6 +72,19 @@ def main() -> None:
             ROOT / "overlays/functional_keys.json",
             upstream / f"app/src/main/assets/layouts/functional/{target}",
         )
+
+    # LeanType's tablet-row path adds dedicated ! and ? keys after the selected
+    # character layout is parsed. Remove that runtime injection for PCBoard.
+    # The same symbols remain available through long-press on N and M.
+    locale_infos = upstream / (
+        "app/src/main/java/helium314/keyboard/keyboard/internal/"
+        "keyboard_parser/LocaleKeyboardInfos.kt"
+    )
+    replace_required(
+        locale_infos,
+        'else -> emptyList<KeyData>() to listOf("!".toTextKey(labelFlags = flags), labelQuestion.toTextKey(labelFlags = flags)) // assume alphabet',
+        'else -> emptyList<KeyData>() to emptyList() // PCBoard: punctuation remains on long-press only',
+    )
 
     # Rebrand visible product strings while retaining LeanType's source packages.
     for strings in (upstream / "app/src/main/res").glob("values*/strings.xml"):
