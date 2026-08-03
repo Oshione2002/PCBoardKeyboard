@@ -48,11 +48,11 @@ def main() -> None:
         'applicationId = "com.leanbitlab.leantype"',
         'applicationId = "com.treasure.pcboard"',
     )
-    regex_required(build, r"versionCode\s*=\s*\d+", "versionCode = 3003")
+    regex_required(build, r"versionCode\s*=\s*\d+", "versionCode = 3004")
     regex_required(
         build,
         r'versionName\s*=\s*"[^"]+"',
-        'versionName = "3.0.3-layout"',
+        'versionName = "3.0.4-layout"',
     )
     replace_required(build, "$number-LeanType_", "$number-PCBoard_")
 
@@ -84,6 +84,35 @@ def main() -> None:
         locale_infos,
         'else -> emptyList<KeyData>() to listOf("!".toTextKey(labelFlags = flags), labelQuestion.toTextKey(labelFlags = flags)) // assume alphabet',
         'else -> emptyList<KeyData>() to emptyList() // PCBoard: punctuation remains on long-press only',
+    )
+
+    # With a half-width Tab and nine letter keys, LeanType would normally centre
+    # the whole row and leave equal spacers at both edges. PCBoard instead keeps
+    # Tab at the far left and expands A-L evenly into all remaining width.
+    keyboard_parser = upstream / (
+        "app/src/main/java/helium314/keyboard/keyboard/internal/"
+        "keyboard_parser/KeyboardParser.kt"
+    )
+    replace_required(
+        keyboard_parser,
+        '''            // re-scale total width, or add spacers (or do nothing if totalWidth is near 1)
+            if (totalWidth < 0.9999f) { // add spacers
+''',
+        '''            // PCBoard: a half-width Tab should occupy the small leading gap,
+            // while A-L begin immediately after it and fill the rest of the row.
+            if (totalWidth < 0.9999f
+                    && functionalKeysLeft.size == 1
+                    && functionalKeysRight.isEmpty()
+                    && keys.size == 9
+                    && functionalKeysLeft.first().mWidth <= 0.051f) {
+                val extraPerLetter = (1f - totalWidth) / keys.size
+                keys.forEach { it.mWidth += extraPerLetter }
+                totalWidth = allKeys.sumOf { it.mWidth }
+            }
+
+            // re-scale total width, or add spacers (or do nothing if totalWidth is near 1)
+            if (totalWidth < 0.9999f) { // add spacers
+''',
     )
 
     # Rebrand visible product strings while retaining LeanType's source packages.
