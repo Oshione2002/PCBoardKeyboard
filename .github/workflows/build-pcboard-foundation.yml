@@ -1,0 +1,187 @@
+name: Build PCBoard LeanType Edition
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/pcboard-layout-3-0-4
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out PCBoard overlay
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned NDK
+        run: sdkmanager "ndk;28.0.13004108"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Fetch pinned LeanType source
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_commit="$(tr -d '\r\n' < upstream/LEANTYPE_COMMIT)"
+          git init leantype
+          git -C leantype remote add origin https://github.com/LeanBitLab/LeanType.git
+          git -C leantype fetch --depth 1 origin "$upstream_commit"
+          git -C leantype checkout --detach FETCH_HEAD
+          test "$(git -C leantype rev-parse HEAD)" = "$upstream_commit"
+
+      - name: Apply and validate PCBoard half-width Tab layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/apply_pcboard_overlay.py
+          python3 scripts/apply_pcboard_overlay.py leantype
+
+          grep -Fq 'applicationId = "com.treasure.pcboard"' leantype/app/build.gradle.kts
+          grep -Fq 'versionName = "3.0.4-layout"' leantype/app/build.gradle.kts
+
+          locale_infos='leantype/app/src/main/java/helium314/keyboard/keyboard/internal/keyboard_parser/LocaleKeyboardInfos.kt'
+          grep -Fq 'else -> emptyList<KeyData>() to emptyList() // PCBoard: punctuation remains on long-press only' "$locale_infos"
+          ! grep -Fq 'else -> emptyList<KeyData>() to listOf("!".toTextKey' "$locale_infos"
+
+          keyboard_parser='leantype/app/src/main/java/helium314/keyboard/keyboard/internal/keyboard_parser/KeyboardParser.kt'
+          grep -Fq 'val extraPerLetter = (1f - totalWidth) / keys.size' "$keyboard_parser"
+          grep -Fq 'functionalKeysLeft.first().mWidth <= 0.051f' "$keyboard_parser"
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("leantype/app/src/main/assets/layouts")
+
+          qwerty = json.loads((root / "main/qwerty.txt").read_text(encoding="utf-8"))
+          assert [key["label"] for key in qwerty[0]] == list("qwertyuiop")
+          assert [key["label"] for key in qwerty[1]] == list("asdfghjkl")
+          assert [key["label"] for key in qwerty[2]] == list("zxcvbnm")
+          assert all(key["width"] == 0.10 for key in qwerty[0])
+          assert all(abs(key["width"] - 0.0977778) < 0.000001 for key in qwerty[1])
+          assert all(key["width"] == 0.10 for key in qwerty[2])
+
+          pc = json.loads((root / "main/pcqwerty.json").read_text(encoding="utf-8"))
+          assert len(pc) == 4
+          assert [key["label"] for key in pc[1]] == list("qwertyuiop")
+          assert [key["label"] for key in pc[2]] == list("asdfghjkl")
+          assert [key["label"] for key in pc[3]] == list("zxcvbnm")
+          assert all(key["width"] == 0.10 for key in pc[1])
+          assert all(abs(key["width"] - 0.0977778) < 0.000001 for key in pc[2])
+          assert all(key["width"] == 0.10 for key in pc[3])
+          assert not any(key.get("label") in {"!", "?"} for key in pc[3])
+
+          for name in ("functional_keys.json", "functional_keys_tablet.json"):
+              data = json.loads((root / "functional" / name).read_text(encoding="utf-8"))
+              tab = data[0][0]["alphabet"]
+              assert tab["label"] == "tab" and tab["width"] == 0.05
+              assert data[1][0]["label"] == "shift"
+              assert data[1][2]["label"] == "delete"
+              bottom = data[2]
+              assert bottom[0]["alphabet"]["label"] == "ctrl"
+              assert bottom[1]["default"]["label"] == "comma"
+              switch = bottom[2]["alphabet"]
+              assert switch["label"] == "?1"
+              assert switch["code"] == -10001
+              assert switch["width"] == 0.10
+              assert bottom[-3]["label"] == "space"
+              assert bottom[-2]["label"] == "period"
+              assert bottom[-1]["label"] == "action"
+          PY
+
+          # Guard against accidental changes to LeanType defaults and feature set.
+          grep -Fq 'const val PREF_AUTO_CORRECTION = false' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+          grep -Fq 'const val PREF_SHOW_NUMBER_ROW = false' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+          grep -Fq 'val PREF_KEYBOARD_HEIGHT_SCALE = Array(2) { 0.77f }' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+          grep -Fq 'const val PREF_DISABLE_NETWORK = false' leantype/app/src/main/java/helium314/keyboard/latin/settings/Defaults.kt
+
+      - name: Compile test sources and build internet-enabled AI keyboard
+        id: gradle
+        shell: bash
+        run: |
+          set -o pipefail
+          cd leantype
+          chmod +x gradlew
+          set +e
+          ./gradlew \
+            :app:compileStandardfullRunTestsKotlin \
+            :app:compileStandardfullRunTestsUnitTestKotlin \
+            :app:assembleStandardfullDebug \
+            --stacktrace 2>&1 | tee ../pcboard-gradle.log
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
+
+      - name: Generate upstream lint report
+        id: lint
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          cd leantype
+          set +e
+          ./gradlew :app:lintStandardfullDebug --stacktrace 2>&1 | tee -a ../pcboard-gradle.log
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "LeanType upstream lint status: $status"
+          exit 0
+
+      - name: Verify APK identity and internet permission
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find leantype/app/build/outputs/apk/standardfull/debug -type f -name '*.apk' | head -n 1)"
+          test -n "$apk"
+          echo "APK=$apk"
+
+          permissions="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest permissions "$apk")"
+          echo "$permissions"
+          grep -q 'android.permission.INTERNET' <<<"$permissions"
+
+          package_name="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest application-id "$apk")"
+          echo "Package: $package_name"
+          test "$package_name" = "com.treasure.pcboard.debug"
+
+          version_name="$($ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer manifest version-name "$apk")"
+          echo "Version: $version_name"
+          test "$version_name" = "3.0.4-layout"
+
+          sha256sum "$apk" | tee PCBoard-SHA256.txt
+
+      - name: Upload compiler and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCBoard-3.0.4-reports
+          path: |
+            pcboard-gradle.log
+            leantype/app/build/reports/lint-results-standardfullDebug.*
+            leantype/app/build/reports/lint-results-standardfullDebug/**
+          if-no-files-found: warn
+
+      - name: Upload PCBoard APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCBoard-3.0.4-LeanType-AI-layout-apk
+          path: |
+            leantype/app/build/outputs/apk/standardfull/debug/*.apk
+            PCBoard-SHA256.txt
+          if-no-files-found: error
